@@ -1,0 +1,9 @@
+# train and val datasets (image directory or *.txt file with image paths)
+train: data/dataset/NLB/train.txt
+test: data/dataset/NLB/test.txt
+
+# number of classes
+nc: 1
+
+# class names
+names: ['nlb']
