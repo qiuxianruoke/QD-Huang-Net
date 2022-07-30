@@ -1110,7 +1110,6 @@ data/images/DSC03232_1.JPG
 data/images/J_170824_133542.jpg
 data/images/J_170928_144059.jpg
 data/images/DSC03547_0.JPG
-data/images/DSC02071_3.JPG
 data/images/DSC05013_1.JPG
 data/images/J_170824_140453.jpg
 data/images/DSC05672_1.JPG
@@ -7320,7 +7319,6 @@ data/images/DSC04811_0.JPG
 data/images/J_170830_151710.jpg
 data/images/J_170830_135733.jpg
 data/images/DSC05471_0.JPG
-data/images/DSC06154_0.JPG
 data/images/J_170928_144532.jpg
 data/images/J_170913_142136.jpg
 data/images/J_170913_142548.jpg
@@ -9876,7 +9874,6 @@ data/images/DSC06181_0.JPG
 data/images/DSC04949_3.JPG
 data/images/J_170911_152913.jpg
 data/images/DSC06024_1.JPG
-data/images/DSC05740_1.JPG
 data/images/DSC02329_3.JPG
 data/images/DSC05816_0.JPG
 data/images/DSC04554.JPG

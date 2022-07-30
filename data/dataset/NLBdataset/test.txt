@@ -1156,7 +1156,6 @@ data/images/DSC03247_0.JPG
 data/images/DSC03473_0.JPG
 data/images/J_170830_154656.jpg
 data/images/J_170908_123233.jpg
-data/images/DSC05511_1.JPG
 data/images/DSC03398_0.JPG
 data/images/DSC05696_3.JPG
 data/images/J_170913_142406.jpg
