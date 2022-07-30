@@ -1,7 +1,7 @@
 # train and val datasets (image directory or *.txt file with image paths)
-train: data/dataset/NLB/train.txt
-val: data/dataset/NLB/test.txt
-test: data/dataset/NLB/test.txt
+train: data/dataset/NLBdataset/train.txt
+val: data/dataset/NLBdataset/test.txt
+test: data/dataset/NLBdataset/test.txt
 
 # number of classes
 nc: 1
