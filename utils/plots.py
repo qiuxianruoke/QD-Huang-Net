@@ -93,6 +93,7 @@ def output_to_target(output, width, height):
 
     targets = []
     for i, o in enumerate(output):
+        o = o.cpu().numpy()
         if o is not None:
             for pred in o:
                 box = pred[:4]
