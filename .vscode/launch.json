@@ -13,10 +13,10 @@
             "justMyCode": true,
             "args": ["--batch-size", "4",
                     "--img", "640",
-                    "--data", "data/dataset/PlantDoc-Object-Detection-Dataset-master/plantdoc.yaml",
+                    "--data", "data/plantdoc.yaml",
                     "--cfg", "cfg/yolor_p6_plandoc.cfg",
                     "--weights", "''",
-                    "--device", "cpu",
+                    "--device", "0",
                     "--name", "yolor_p6_palntdoc",
                     "--hyp", "hyp.scratch.1280.yaml",
                     "--epochs", "300"

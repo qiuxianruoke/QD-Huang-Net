@@ -1,0 +1,13 @@
+data/images
+data/labels
+data/plantdoc.yaml
+data/plantdoc/test.txt
+data/plantdoc/train.txt
+data/plantdoc/val.txt
+data/labels.cache3
+data/dataset/NLBdataset
+.vscode
+data/plantdoc
+runs
+materies
+model_st.xlsx

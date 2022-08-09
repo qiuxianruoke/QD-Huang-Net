@@ -11,8 +11,8 @@ def create_modules(module_defs, img_size, cfg):
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
     _ = module_defs.pop(0)  # cfg training hyperparams (unused)
-    output_filters = [3]  # input channels
-    module_list = nn.ModuleList()
+    output_filters = [3]  # input channels, record num of out_channels each layer
+    module_list = nn.ModuleList() # recorde layers
     routs = []  # list of layers which rout to deeper layers
     yolo_index = -1
 
@@ -582,9 +582,13 @@ class Darknet(nn.Module):
                            torch_utils.scale_img(x.flip(3), s[0]),  # flip-lr and scale
                            torch_utils.scale_img(x, s[1]),  # scale
                            ), 0)
-
+        # TODO stastic change of feature map
+        in_channels = []
+        out_channels = []
         for i, module in enumerate(self.module_list):
             name = module.__class__.__name__
+            # TODO 
+            in_channels.append(list(x.shape))
             #print(name)
             if name in ['WeightedFeatureFusion', 'FeatureConcat', 'FeatureConcat2', 'FeatureConcat3', 'FeatureConcat_l', 'ScaleChannel', 'ShiftChannel', 'ShiftChannel2D', 'ControlChannel', 'ControlChannel2D', 'AlternateChannel', 'AlternateChannel2D', 'SelectChannel', 'SelectChannel2D', 'ScaleSpatial']:  # sum, concat
                 if verbose:
@@ -607,6 +611,15 @@ class Darknet(nn.Module):
             if verbose:
                 print('%g/%g %s -' % (i, len(self.module_list), name), list(x.shape), str)
                 str = ''
+            # TODO
+            out_channels.append(list(x.shape))
+        import pandas as pd
+        S1 = pd.Series(in_channels)
+        S2 = pd.Series(out_channels)
+        S3 = pd.Series(self.routs)
+        model_stastic = pd.DataFrame({'in': S1, 'out': S2, 'mark':S3})
+        model_stastic.to_excel('model_st.xlsx', sheet_name='sheet1')
+
 
         if self.training:  # train
             return yolo_out
