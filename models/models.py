@@ -523,8 +523,16 @@ class JDELayer(nn.Module):
 class Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), verbose=False):
+    def __init__(self, cfg, img_size=(416, 416), verbose=False, \
+        head_distillation=False, neck_distillation=False, backbone_distillation=False, \
+            backbone_feature=[], neck_feature=[]):
         super(Darknet, self).__init__()
+        
+        self.backbone_feature = backbone_feature
+        self.neck_feature = neck_feature
+        self.head_distillation = head_distillation
+        self.neck_distillation = neck_distillation
+        self.backbone_distillation = backbone_distillation
 
         self.module_defs = parse_model_cfg(cfg)
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg)
@@ -622,7 +630,9 @@ class Darknet(nn.Module):
 
 
         if self.training:  # train
-            return yolo_out
+            backbone_out = [out[i] for i in self.backbone_feature]
+            neck_out = [out[i] for i in self.neck_feature]
+            return yolo_out, neck_out, backbone_out
         elif ONNX_EXPORT:  # export
             x = [torch.cat(x, 0) for x in zip(*yolo_out)]
             return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4

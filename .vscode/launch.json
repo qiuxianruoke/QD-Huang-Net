@@ -14,7 +14,7 @@
             "args": ["--batch-size", "4",
                     "--img", "640",
                     "--data", "data/plantdoc.yaml",
-                    "--cfg", "cfg/yolor_lite_plandoc.cfg",
+                    "--cfg", "cfg/yolor_p6.cfg",
                     "--weights", "''",
                     "--device", "0",
                     "--name", "yolor_p6_palntdoc",
