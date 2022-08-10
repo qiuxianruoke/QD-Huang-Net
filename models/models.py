@@ -18,7 +18,6 @@ def create_modules(module_defs, img_size, cfg):
 
     for i, mdef in enumerate(module_defs):
         modules = nn.Sequential()
-
         if mdef['type'] == 'convolutional':
             bn = mdef['batch_normalize']
             filters = mdef['filters']
@@ -588,6 +587,7 @@ class Darknet(nn.Module):
         for i, module in enumerate(self.module_list):
             name = module.__class__.__name__
             # TODO 
+            print(i)
             in_channels.append(list(x.shape))
             #print(name)
             if name in ['WeightedFeatureFusion', 'FeatureConcat', 'FeatureConcat2', 'FeatureConcat3', 'FeatureConcat_l', 'ScaleChannel', 'ShiftChannel', 'ShiftChannel2D', 'ControlChannel', 'ControlChannel2D', 'AlternateChannel', 'AlternateChannel2D', 'SelectChannel', 'SelectChannel2D', 'ScaleSpatial']:  # sum, concat
