@@ -1,6 +1,7 @@
 import argparse
 import logging
 import math
+from operator import truediv
 import os
 import random
 import time
@@ -19,7 +20,7 @@ from torch.cuda import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from distillation_tools import compute_distillation_loss
+from distillation_tools.compute_distillation_loss import distillation_loss
 import test  # import test.py to get mAP after each epoch
 #from models.yolo import Model
 from models.models import *
@@ -48,16 +49,16 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.total_batch_size, opt.teacher_weights, opt.student_weights,opt.global_rank
     
     head_distillation, neck_distillation, backbone_distillation = \
-        opt.head_distillation, opt.neck_distillation, opt.backbone_distillatio
+        opt.head_distillation, opt.neck_distillation, opt.backbone_distillation
 
     student_neck_feature, student_backbone_feature = \
-        opt.student_neck_feature, opt.student_backbone_featur
+        [int(i) for i in opt.student_neck_feature.split(',')], [int(i) for i in opt.student_backbone_feature.split(',')]
     
     teacher_neck_feature, teacher_backbone_feature = \
-        opt.teacher_neck_feature, opt.teacher_backbone_featur
+        [int(i) for i in opt.teacher_neck_feature.split(',')], [int(i) for i in opt.teacher_backbone_feature.split(',')]
 
     head_weight, neck_weight, backbone_weight = \
-        opt.head_weigh, opt.neck_weight, opt.backbone_weight
+        opt.head_weight, opt.neck_weight, opt.backbone_weight
 
     target_weight, background_weight = \
         opt.target_weight, opt.background_weight
@@ -323,11 +324,32 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
 
             # Forward
             with amp.autocast(enabled=cuda):
-                student_head_out, student_neck_out, student_backbone_out = student(imgs)  # forward
-                teacher_head_out, teacher_neck_out, teacher_backbone_out = teacher(imgs) 
+                student_head_out, student_neck_out, student_backbone_out = student(imgs, distillate=True)  # forward
+                teacher_head_out, teacher_neck_out, teacher_backbone_out = teacher(imgs, distillate=True)
+                student_head_out_p = [s.permute(0,1,4,2,3).contiguous().view(s.shape[0], -1,s.shape[2], s.shape[2]) \
+                    for s in student_head_out]
+                teacher_head_out_p = [s.permute(0,1,4,2,3).contiguous().view(s.shape[0], -1,s.shape[2], s.shape[2]) \
+                for s in teacher_head_out]
                 # TODO distillating
-                compute_distillation_loss(targets.to(device))
+                distillating_loss = distillation_loss(targets.to(device), \
+                    head_distillation=head_distillation, \
+                    neck_distillation=neck_distillation, \
+                    backbone_distillation=backbone_distillation, \
+                    student_head_feature=student_head_out_p, \
+                    student_neck_feature=student_neck_out, \
+                    student_backbone_feature=student_backbone_out, \
+                    teacher_head_feature=teacher_head_out_p, \
+                    teacher_neck_feature=teacher_neck_out, \
+                    teacher_backbone_feature=teacher_backbone_out,\
+                    head_weight=head_weight, \
+                    neck_weight=neck_weight, \
+                    backbone_weight=backbone_weight, device=device, \
+                    target_weight=target_weight, \
+                    background_weight=backbone_weight, \
+                    attention_weight=attention_weight, \
+                    global_weight=global_weight)
                 loss, loss_items = compute_loss(student_head_out, targets.to(device), student)  # loss scaled by batch_size
+                loss += distillating_loss * opt.distillation_weight
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
 
@@ -502,13 +524,13 @@ if __name__ == '__main__':
     parser.add_argument('--teacher_cfg', type=str, default='', help='teacher_model.yaml path')
     parser.add_argument('--student_weights', type=str, default='', help='initial student weights path')
     parser.add_argument('--student_cfg', type=str, default='', help='student_model.yaml path')
-    parser.add_argument('--head_distilation', type=bool, default=True, help='do head distillating')
-    parser.add_argument('--neck_distilation', type=bool, default=True, help='do neck distillating')
-    parser.add_argument('--backbone_distilation', type=bool, default=True, help='do backbone distillating')
-    parser.add_argument('--student_backbone_feature', type=list, default=[], help='mark sudent\'s featuer map of backbone')
-    parser.add_argument('--teacher_backbone_feature', type=list, default=[], help='mark teacher\'s featuer map of backbone')
-    parser.add_argument('--student_neck_feature', type=list, default=[], help='mark sudent\'s featuer map of neck')
-    parser.add_argument('--teacher_neck_feature', type=list, default=[], help='mark teacher\'s featuer map of neck')
+    parser.add_argument('--head_distillation', type=bool, default=True, help='do head distillating')
+    parser.add_argument('--neck_distillation', type=bool, default=True, help='do neck distillating')
+    parser.add_argument('--backbone_distillation', type=bool, default=True, help='do backbone distillating')
+    parser.add_argument('--student_backbone_feature', type=str, default='', help='mark sudent\'s featuer map of backbone')
+    parser.add_argument('--teacher_backbone_feature', type=str, default='', help='mark teacher\'s featuer map of backbone')
+    parser.add_argument('--student_neck_feature', type=str, default='', help='mark sudent\'s featuer map of neck')
+    parser.add_argument('--teacher_neck_feature', type=str, default='', help='mark teacher\'s featuer map of neck')
     parser.add_argument('--head_weight', type=float, default=1.0, help='head distillation weight')
     parser.add_argument('--neck_weight', type=float, default=1.0, help='neck distillation weight')
     parser.add_argument('--backbone_weight', type=float, default=1.0, help='backbone distillation weight')
@@ -516,6 +538,7 @@ if __name__ == '__main__':
     parser.add_argument('--background_weight', type=float, default=0.5, help='background weight')
     parser.add_argument('--attention_weight', type=float, default=0.5, help='attention weight')
     parser.add_argument('--global_weight', type=float, default=0.5, help='global weight')
+    parser.add_argument('--distillation_weight', type=float, default=0.3, help='distillation weight')
     parser.add_argument('--data', type=str, default='data/coco.yaml', help='data.yaml path')
     parser.add_argument('--hyp', type=str, default='data/hyp.scratch.1280.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
@@ -561,8 +584,10 @@ if __name__ == '__main__':
         logger.info('Resuming training from %s' % ckpt)
     else:
         # opt.hyp = opt.hyp or ('hyp.finetune.yaml' if opt.weights else 'hyp.scratch.yaml')
-        opt.data, opt.cfg, opt.hyp = check_file(opt.data), check_file(opt.cfg), check_file(opt.hyp)  # check files
-        assert len(opt.cfg) or len(opt.weights), 'either --cfg or --weights must be specified'
+        opt.data, opt.student_cfg, opt.teacher_cfg, opt.hyp = \
+            check_file(opt.data), check_file(opt.student_cfg), check_file(opt.teacher_cfg),check_file(opt.hyp)  # check files
+        assert len(opt.student_cfg) or len(opt.student_weights), 'either --student_cfg or --student_weights must be specified'
+        assert len(opt.teacher_cfg) or len(opt.teacher_weights), 'either --teacher_cfg or --teacher_weights must be specified'
         opt.img_size.extend([opt.img_size[-1]] * (2 - len(opt.img_size)))  # extend to 2 sizes (train, test)
         opt.name = 'evolve' if opt.evolve else opt.name
         opt.save_dir = increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok | opt.evolve)  # increment run

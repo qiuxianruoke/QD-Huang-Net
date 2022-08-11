@@ -544,10 +544,10 @@ class Darknet(nn.Module):
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
         self.info(verbose) if not ONNX_EXPORT else None  # print model description
 
-    def forward(self, x, augment=False, verbose=False):
+    def forward(self, x, augment=False, verbose=False, distillate=False):
 
         if not augment:
-            return self.forward_once(x)
+            return self.forward_once(x, distillate=distillate)
         else:  # Augment images (inference and test only) https://github.com/ultralytics/yolov3/issues/931
             img_size = x.shape[-2:]  # height, width
             s = [0.83, 0.67]  # scales
@@ -557,7 +557,7 @@ class Darknet(nn.Module):
                                     torch_utils.scale_img(x, s[1], same_shape=False),  # scale
                                     )):
                 # cv2.imwrite('img%g.jpg' % i, 255 * xi[0].numpy().transpose((1, 2, 0))[:, :, ::-1])
-                y.append(self.forward_once(xi)[0])
+                y.append(self.forward_once(xi, distillate=distillate)[0])
 
             y[1][..., :4] /= s[0]  # scale
             y[1][..., 0] = img_size[1] - y[1][..., 0]  # flip lr
@@ -574,7 +574,7 @@ class Darknet(nn.Module):
             y = torch.cat(y, 1)
             return y, None
 
-    def forward_once(self, x, augment=False, verbose=False):
+    def forward_once(self, x, augment=False, verbose=False, distillate=False):
         img_size = x.shape[-2:]  # height, width
         yolo_out, out = [], []
         if verbose:
@@ -594,8 +594,6 @@ class Darknet(nn.Module):
         out_channels = []
         for i, module in enumerate(self.module_list):
             name = module.__class__.__name__
-            # TODO 
-            print(i)
             in_channels.append(list(x.shape))
             #print(name)
             if name in ['WeightedFeatureFusion', 'FeatureConcat', 'FeatureConcat2', 'FeatureConcat3', 'FeatureConcat_l', 'ScaleChannel', 'ShiftChannel', 'ShiftChannel2D', 'ControlChannel', 'ControlChannel2D', 'AlternateChannel', 'AlternateChannel2D', 'SelectChannel', 'SelectChannel2D', 'ScaleSpatial']:  # sum, concat
@@ -621,18 +619,22 @@ class Darknet(nn.Module):
                 str = ''
             # TODO
             out_channels.append(list(x.shape))
-        import pandas as pd
-        S1 = pd.Series(in_channels)
-        S2 = pd.Series(out_channels)
-        S3 = pd.Series(self.routs)
-        model_stastic = pd.DataFrame({'in': S1, 'out': S2, 'mark':S3})
-        model_stastic.to_excel('model_st.xlsx', sheet_name='sheet1')
+        # import pandas as pd
+        # S1 = pd.Series(in_channels)
+        # S2 = pd.Series(out_channels)
+        # S3 = pd.Series(self.routs)
+        # model_stastic = pd.DataFrame({'in': S1, 'out': S2, 'mark':S3})
+        # model_stastic.to_excel('model_st.xlsx', sheet_name='sheet1')
 
 
-        if self.training:  # train
+        if distillate:
+            if not self.training:
+                yolo_out = [i[1] for i in yolo_out]
             backbone_out = [out[i] for i in self.backbone_feature]
             neck_out = [out[i] for i in self.neck_feature]
             return yolo_out, neck_out, backbone_out
+        if self.training:  # train
+            return yolo_out
         elif ONNX_EXPORT:  # export
             x = [torch.cat(x, 0) for x in zip(*yolo_out)]
             return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4

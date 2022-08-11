@@ -22,6 +22,30 @@
                     "--epochs", "300"
                 ]
         },
+        {
+            "name": "Distillation",
+            "type": "python",
+            "request": "launch",
+            "program": "./distillate.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--batch-size", "2",
+                    "--img", "640",
+                    "--data", "data/plantdoc.yaml",
+                    "--teacher_cfg", "cfg/yolor_p6_plantdoc.cfg",
+                    "--student_cfg", "cfg/yolor_lite_plantdoc.cfg",
+                    "--teacher_weights", "runs/teacher.pt",
+                    "--student_weights", "''",
+                    "--student_backbone_feature", "25,39,49,63",
+                    "--teacher_backbone_feature", "43,70,85,115",
+                    "--student_neck_feature", "99,108,117,126",
+                    "--teacher_neck_feature", "163,176,189,202",
+                    "--device", "0",
+                    "--name", "yolor_p6_palntdoc",
+                    "--hyp", "hyp.scratch.1280.yaml",
+                    "--epochs", "300"
+                ]
+        },
 
         {
             "name": "this py",

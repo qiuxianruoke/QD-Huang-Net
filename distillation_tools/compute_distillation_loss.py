@@ -1,6 +1,11 @@
 import torch
-from distillation_tools import bmask, smask, plane_mask, channel_mask, gcblock
+from distillation_tools.bmask import bmask
+from distillation_tools.smask import smask
+from distillation_tools.plane_mask import plane_mask
+from distillation_tools.channel_mask import channel_mask
 import torch.nn as nn
+from distillation_tools.gcblock import GCBlock
+
 
 
 def distillation_loss(target, \
@@ -20,6 +25,8 @@ def distillation_loss(target, \
         background_weight=0.5, \
         attention_weight=0.5, \
         global_weight=0.5):
+
+    DISTILLATION_RATE = 1e-9
     
     # head loss
     # focal loss
@@ -44,9 +51,9 @@ def distillation_loss(target, \
     b_attention_loss = torch.zeros(1).to(device)
 
     # gcblock
-    head_gcbolck = [gcblock(f.shape(1)) for f in teacher_head_feature]
-    neck_gcbolck = [gcblock(f.shape(1)) for f in teacher_neck_feature]
-    backbone_gcbolck = [gcblock(f.shape(1)) for f in teacher_backbone_feature]
+    head_gcbolck = [GCBlock(f.shape[1]).to(device) for f in teacher_head_feature]
+    neck_gcbolck = [GCBlock(f.shape[1]).to(device) for f in teacher_neck_feature]
+    backbone_gcbolck = [GCBlock(f.shape[1]).to(device) for f in teacher_backbone_feature]
 
     l1 = nn.L1Loss()
 
@@ -60,15 +67,15 @@ def distillation_loss(target, \
             sacmask = channel_mask(shf)
             tapmask = plane_mask(thf)   # plane attention mask
             sapmask = plane_mask(shf)
-            tsmask = smask(thf) # scale mask
-            # ssmask = smask(shf)
-            tbmask = bmask(thf) # binary mask
-            # sbmask = bmask(shf)
+            tsmask = smask(thf, target) # scale mask
+            # ssmask = smask(shf, target)
+            tbmask = bmask(thf, target) # binary mask
+            # sbmask = bmask(shf, target)
             tg_feature = head_gcbolck[i](thf)  # global loss
             sg_feature = head_gcbolck[i](shf)
             h_local_loss += (torch.sum(\
                 tbmask * tsmask * tacmask * tapmask * (thf - shf)**2) * target_weight +\
-                torch.sum((1-tbmask) * tsmask * tacmask * tapmask * (thf - shf)**2) * backbone_weight)
+                torch.sum((1-tbmask) * tsmask * tacmask * tapmask * (thf - shf)**2) * background_weight)
             h_attention_loss += (l1(tapmask, sapmask) + l1(tacmask, sacmask)) * attention_weight
             h_global_loss += torch.sum((tg_feature - sg_feature)**2) * global_weight
 
@@ -77,12 +84,12 @@ def distillation_loss(target, \
             sacmask = channel_mask(snf)
             tapmask = plane_mask(tnf)   # plane attention mask
             sapmask = plane_mask(snf)
-            tsmask = smask(tnf) # scale mask
+            tsmask = smask(tnf, target) # scale mask
             # ssmask = smask(shf)
-            tbmask = bmask(tnf) # binary mask
+            tbmask = bmask(tnf, target) # binary mask
             # sbmask = bmask(shf)
-            tg_feature = head_gcbolck[i](tnf)  # global loss
-            sg_feature = head_gcbolck[i](snf)
+            tg_feature = neck_gcbolck[i](tnf)  # global loss
+            sg_feature = neck_gcbolck[i](snf)
             n_local_loss += (torch.sum(\
                 tbmask * tsmask * tacmask * tapmask * (tnf - snf)**2) * target_weight +\
                 torch.sum((1-tbmask) * tsmask * tacmask * tapmask * (tnf - snf)**2) * backbone_weight)
@@ -94,17 +101,17 @@ def distillation_loss(target, \
             sacmask = channel_mask(sbf)
             tapmask = plane_mask(tbf)   # plane attention mask
             sapmask = plane_mask(sbf)
-            tsmask = smask(tbf) # scale mask
+            tsmask = smask(tbf, target) # scale mask
             # ssmask = smask(shf)
-            tbmask = bmask(tbf) # binary mask
+            tbmask = bmask(tbf, target) # binary mask
             # sbmask = bmask(shf)
-            tg_feature = head_gcbolck[i](tbf)  # global loss
-            sg_feature = head_gcbolck[i](sbf)
+            tg_feature = backbone_gcbolck[i](tbf)  # global loss
+            sg_feature = backbone_gcbolck[i](sbf)
             b_local_loss += (torch.sum(\
                 tbmask * tsmask * tacmask * tapmask * (tbf - sbf)**2) * target_weight +\
                 torch.sum((1-tbmask) * tsmask * tacmask * tapmask * (tbf - sbf)**2) * backbone_weight)
             b_attention_loss += (l1(tapmask, sapmask) + l1(tacmask, sacmask)) * attention_weight
             b_global_loss += torch.sum((tg_feature - sg_feature)**2) * global_weight
-    return (h_local_loss + h_attention_loss + h_global_loss)*head_weight + \
+    return ((h_local_loss + h_attention_loss + h_global_loss)*head_weight + \
                 (n_local_loss + n_attention_loss + n_global_loss)*neck_weight + \
-                    (b_local_loss + b_attention_loss + b_global_loss)*backbone_weight
+                    (b_local_loss + b_attention_loss + b_global_loss)*backbone_weight) * DISTILLATION_RATE
