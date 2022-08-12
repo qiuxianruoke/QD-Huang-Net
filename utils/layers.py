@@ -1,9 +1,8 @@
 import torch.nn.functional as F
-
 from utils.general import *
-
 import torch
 from torch import nn
+import torch
 
 try:
     from mish_cuda import MishCuda as Mish
@@ -30,6 +29,11 @@ except: # using Reorg instead
     class DWT(nn.Module):
         def forward(self, x):
             return torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)
+
+class hsigmoid(nn.Module):
+    def forward(self, x):
+        out = F.relu6(x + 3, inplace=True) / 6
+        return out
 
 
 class Reorg(nn.Module):
@@ -531,4 +535,37 @@ class Implicit2DM(nn.Module):
         return self.implicit
     
     
-    
+# MobileNet ==========
+class MBlock(nn.Module):
+    '''expand + depthwise + pointwise'''
+    def __init__(self, kernel_size, in_size, expand_size, out_size, act_function, semodule, stride):
+        super(MBlock, self).__init__()
+        self.stride = stride
+        self.se = semodule
+
+        self.conv1 = nn.Conv2d(in_size, expand_size, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn1 = nn.BatchNorm2d(expand_size)
+        self.act_function1 = act_function
+        self.conv2 = nn.Conv2d(expand_size, expand_size, kernel_size=kernel_size, stride=stride, padding=kernel_size//2, groups=expand_size, bias=False)
+        self.bn2 = nn.BatchNorm2d(expand_size)
+        self.act_function2 = act_function
+        self.conv3 = nn.Conv2d(expand_size, out_size, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn3 = nn.BatchNorm2d(out_size)
+
+        self.shortcut = nn.Sequential()
+        if stride == 1 and in_size != out_size:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_size, out_size, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(out_size),
+            )
+
+    def forward(self, x):
+        out = self.act_function1(self.bn1(self.conv1(x)))
+        out = self.act_function2(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        if self.se != None:
+            out = self.se(out)
+        out = out + self.shortcut(x) if self.stride==1 else out
+        # global my_idx
+        # my_idx += 1
+        return out

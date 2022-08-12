@@ -2,11 +2,35 @@ from utils.google_utils import *
 from utils.layers import *
 from utils.parse_config import *
 from utils import torch_utils
+import torch
+from torch.nn.functional import softmax
 
 ONNX_EXPORT = False
 
+class hswish(nn.Module):
+    def forward(self, x):
+        out = x * F.relu6(x + 3, inplace=True) / 6
+        return out
 
-def create_modules(module_defs, img_size, cfg):
+
+class SeModule(nn.Module):
+    def __init__(self, in_size, reduction=4):
+        super(SeModule, self).__init__()
+        self.se = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_size, in_size // reduction, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(in_size // reduction),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_size // reduction, in_size, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(in_size),
+            hsigmoid()
+        )
+
+    def forward(self, x):
+        return x * self.se(x)
+
+
+def create_modules(module_defs, img_size, cfg, batch_size=None):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
@@ -263,7 +287,10 @@ def create_modules(module_defs, img_size, cfg):
             channels = mdef['filters']
             filters = mdef['atoms']
             modules = Implicit2DC(atom=filters, channel=channels)
-
+        elif mdef['type'] == 'fc':
+            # TODO FC
+            result_pred = None
+            modules = FC(batch_size*mdef['input_size'],  mdef['classes'])
         elif mdef['type'] == 'yolo':
             yolo_index += 1
             stride = [8, 16, 32, 64, 128]  # P3, P4, P5, P6, P7 strides
@@ -322,6 +349,18 @@ def create_modules(module_defs, img_size, cfg):
             except:
                 print('WARNING: smart bias initialization failure.')
 
+        elif mdef['type'] == 'mblock':
+            filters = mdef['filters']
+            if mdef['activation'] == 'ReLU':
+                act_fn = nn.ReLU(inplace=True)
+            else:
+                act_fn = hswish()
+            if mdef['Se'] == 'None':
+                Se = None
+            else:
+                Se = SeModule(filters)
+            modules.add_module('MBlock', MBlock(mdef['size'], output_filters[-1], mdef['expand_size'],\
+                filters, act_fn, Se, mdef['stride']))
         else:
             print('Warning: Unrecognized Layer Type: ' + mdef['type'])
 
@@ -333,6 +372,16 @@ def create_modules(module_defs, img_size, cfg):
     for i in routs:
         routs_binary[i] = True
     return module_list, routs_binary
+
+class FC(nn.Module):
+    def __init__(self, input_size, classes):
+        super(FC, self).__init__()
+        self.linear = nn.Linear(input_size, classes)
+
+    def forward(self, x):
+        result = self.linear(x)
+        result = softmax(result, dim=0)
+        return result
 
 
 class YOLOLayer(nn.Module):
@@ -525,7 +574,7 @@ class Darknet(nn.Module):
 
     def __init__(self, cfg, img_size=(416, 416), verbose=False, \
         head_distillation=False, neck_distillation=False, backbone_distillation=False, \
-            backbone_feature=[], neck_feature=[]):
+            backbone_feature=[], neck_feature=[], batch_size=None):
         super(Darknet, self).__init__()
         
         self.backbone_feature = backbone_feature
@@ -535,7 +584,7 @@ class Darknet(nn.Module):
         self.backbone_distillation = backbone_distillation
 
         self.module_defs = parse_model_cfg(cfg)
-        self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg)
+        self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, batch_size=batch_size)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 
@@ -608,6 +657,9 @@ class Darknet(nn.Module):
                 yolo_out.append(module(x, out))
             elif name == 'JDELayer':
                 yolo_out.append(module(x, out))
+            elif name == 'FC':
+                x = module(x.flatten())
+                return x
             else:  # run module directly, i.e. mtype = 'convolutional', 'upsample', 'maxpool', 'batchnorm2d' etc.
                 #print(module)
                 #print(x.shape)

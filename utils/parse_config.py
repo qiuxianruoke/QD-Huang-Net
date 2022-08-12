@@ -37,11 +37,12 @@ def parse_model_cfg(path):
                 else:
                     mdefs[-1][key] = val  # return string
 
-    # Check all fields are supported
+    # Check all fields are supported TODO add opti
     supported = ['type', 'batch_normalize', 'filters', 'size', 'stride', 'pad', 'activation', 'layers', 'groups',
                  'from', 'mask', 'anchors', 'classes', 'num', 'jitter', 'ignore_thresh', 'truth_thresh', 'random',
                  'stride_x', 'stride_y', 'weights_type', 'weights_normalization', 'scale_x_y', 'beta_nms', 'nms_kind',
-                 'iou_loss', 'iou_normalizer', 'cls_normalizer', 'iou_thresh', 'atoms', 'na', 'nc']
+                 'iou_loss', 'iou_normalizer', 'cls_normalizer', 'iou_thresh', 'atoms', 'na', 'nc', 'expand_size', \
+                 'Se', 'input_size']
 
     f = []  # fields
     for x in mdefs[1:]:
