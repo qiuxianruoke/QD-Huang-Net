@@ -3,7 +3,6 @@ from utils.layers import *
 from utils.parse_config import *
 from utils import torch_utils
 import torch
-from torch.nn.functional import softmax
 
 ONNX_EXPORT = False
 
@@ -380,7 +379,6 @@ class FC(nn.Module):
 
     def forward(self, x):
         result = self.linear(x)
-        result = softmax(result, dim=0)
         return result
 
 

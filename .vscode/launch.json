@@ -50,13 +50,13 @@
             "args": ["--batch-size", "4",
                     "--img", "640",
                     "--data", "data/plantdoc.yaml",
-                    "--cfg", "cfg/yolor_backbone.cfg",
+                    "--cfg", "cfg/yolor_lite_backbone.cfg",
                     "--weights", "''",
                     "--device", "0",
                     "--name", "myolor",
                     "--hyp", "hyp.scratch.1280.yaml",
                     "--epochs", "300",
-                    "--backbone_name", "backbone/yolor"
+                    "--backbone_name", "backbone/yolor_lite"
                 ]
         },
         {
