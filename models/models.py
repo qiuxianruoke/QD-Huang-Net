@@ -289,7 +289,7 @@ def create_modules(module_defs, img_size, cfg, batch_size=None):
         elif mdef['type'] == 'fc':
             # TODO FC
             result_pred = None
-            modules = FC(batch_size*mdef['input_size'],  mdef['classes'])
+            modules = FC(mdef['input_size'],  mdef['classes'])
         elif mdef['type'] == 'yolo':
             yolo_index += 1
             stride = [8, 16, 32, 64, 128]  # P3, P4, P5, P6, P7 strides
@@ -656,7 +656,7 @@ class Darknet(nn.Module):
             elif name == 'JDELayer':
                 yolo_out.append(module(x, out))
             elif name == 'FC':
-                x = module(x.flatten())
+                x = module(x.reshape(x.shape[0], -1))
                 return x
             else:  # run module directly, i.e. mtype = 'convolutional', 'upsample', 'maxpool', 'batchnorm2d' etc.
                 #print(module)

@@ -1,12 +1,4 @@
 import argparse
-import logging
-import math
-import os
-import random
-import time
-from pathlib import Path
-from warnings import warn
-
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -18,7 +10,7 @@ from models.models import *
 def train(opt):
     model = Darknet(opt.cfg, \
                 batch_size=opt.batch_size).to(opt.device)
-    print(model.parameters)
+    # print(model.parameters)
     # test
     x = torch.rand(8,3,640,640)
     result =model(x) # result未归一化
