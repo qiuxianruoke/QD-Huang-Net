@@ -13,3 +13,6 @@ materies
 model_st.xlsx
 backbone
 yolor_p6.pt
+labels_st.py
+labels_st.png
+img.png
