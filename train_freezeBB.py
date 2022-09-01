@@ -47,7 +47,6 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     save_dir, epochs, batch_size, total_batch_size, weights, rank = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.total_batch_size, opt.weights, opt.global_rank
 
-    nh_weights = opt.neck_head_weights
     # Directories
     wdir = save_dir / 'weights'
     wdir.mkdir(parents=True, exist_ok=True)  # make dir
@@ -80,15 +79,12 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
         with torch_distributed_zero_first(rank):
             attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
-        nh_ckpt = torch.load(nh_weights, map_location=device)
         model = Darknet(opt.cfg).to(device)  # create
         state_dict = {}
         for k, v in ckpt.items():
             if 'linear' not in k:
                 state_dict[k] = v
-        nh_state_dict = {k: v for k, v in nh_ckpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
-        nh_state_dict.update(state_dict)
-        model.load_state_dict(nh_state_dict, strict=False) # HQD
+        model.load_state_dict(state_dict, strict=False)
         print('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
     else:
         model = Darknet(opt.cfg).to(device) # create model
@@ -140,7 +136,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     best_fitness_p, best_fitness_r, best_fitness_ap50, best_fitness_ap, best_fitness_f = 0.0, 0.0, 0.0, 0.0, 0.0
     if pretrained:
         # Optimizer
-        if nh_ckpt['optimizer'] is not None:
+        if ckpt.get('optimizer') is not None  and ckpt['optimizer'] is not None:
             optimizer.load_state_dict(ckpt['optimizer'])
             best_fitness = ckpt['best_fitness']
             best_fitness_p = ckpt['best_fitness_p']
@@ -150,12 +146,16 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
             best_fitness_f = ckpt['best_fitness_f']
 
         # Results
-        if nh_ckpt.get('training_results') is not None:
+        if ckpt.get('training_results') is not None:
             with open(results_file, 'w') as file:
-                file.write(nh_ckpt['training_results'])  # write results.txt
+                file.write(ckpt['training_results'])  # write results.txt
 
         # Epochs
-        start_epoch = 0
+        if ckpt.get('epoch') is None:
+            start_epoch = 0
+        else:
+            start_epoch = ckpt['epoch'] + 1
+            
         if opt.resume:
             assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
         if epochs < start_epoch:
@@ -163,7 +163,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
                         (weights, ckpt['epoch'], epochs))
             epochs += ckpt['epoch']  # finetune additional epochs
 
-        del nh_ckpt, state_dict, ckpt
+        del ckpt, state_dict
 
     # Image sizes
     gs = 64 #int(max(model.stride))  # grid size (max stride)
@@ -465,7 +465,6 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='yolor_p6.pt', help='initial weights path')
-    parser.add_argument('--neck-head-weights', type=str, default='yolor_p6.pt', help='initial weights path')
     parser.add_argument('--cfg', type=str, default='', help='model.yaml path')
     parser.add_argument('--data', type=str, default='data/coco.yaml', help='data.yaml path')
     parser.add_argument('--hyp', type=str, default='data/hyp.scratch.1280.yaml', help='hyperparameters path')
