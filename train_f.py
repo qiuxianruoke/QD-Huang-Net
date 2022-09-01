@@ -80,7 +80,10 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
             attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
         model = Darknet(opt.cfg).to(device)  # create
-        state_dict = {k: v for k, v in ckpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
+        state_dict = {}
+        for k, v in ckpt.items():
+            if 'linear' not in k:
+                state_dict[k] = v
         model.load_state_dict(state_dict, strict=False)
         print('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
     else:
@@ -133,7 +136,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     best_fitness_p, best_fitness_r, best_fitness_ap50, best_fitness_ap, best_fitness_f = 0.0, 0.0, 0.0, 0.0, 0.0
     if pretrained:
         # Optimizer
-        if ckpt['optimizer'] is not None:
+        if ckpt.get('optimizer') is not None and ckpt['optimizer'] is not None:
             optimizer.load_state_dict(ckpt['optimizer'])
             best_fitness = ckpt['best_fitness']
             best_fitness_p = ckpt['best_fitness_p']
@@ -148,7 +151,10 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
                 file.write(ckpt['training_results'])  # write results.txt
 
         # Epochs
-        start_epoch = ckpt['epoch'] + 1
+        if ckpt.get('epoch') is None:
+            start_epoch = 0
+        else:
+            start_epoch = ckpt['epoch'] + 1
         if opt.resume:
             assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
         if epochs < start_epoch:
@@ -231,7 +237,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     torch.save(model, wdir / 'init.pt')
 
     model.train()
-    freeze = [k for k, _ in ckpt['model'].items()]
+    freeze = [k for k, _ in ckpt.items()]
     del ckpt, state_dict
     for k, v in model.named_parameters():
         if k in freeze:

@@ -23,6 +23,25 @@
                 ]
         },
         {
+            "name": "train_Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "./train_Dataset.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--batch-size", "4",
+                    "--img", "640",
+                    "--data", "data/plantdoc.yaml",
+                    "--cfg", "cfg/yolor_p6.cfg",
+                    "--weights", "yolor_p6.pt",
+                    "--neck-head-weights", "Darknet_model.pth",
+                    "--device", "0",
+                    "--name", "yolor_p6_palntdoc",
+                    "--hyp", "hyp.scratch.1280.yaml",
+                    "--epochs", "300"
+                ]
+        },
+        {
             "name": "train_myolor",
             "type": "python",
             "request": "launch",
@@ -158,7 +177,7 @@
                     "--img", "640",
                     "--data", "data/plantdoc.yaml",
                     "--cfg", "cfg/yolor_p6.cfg",
-                    "--weights", "yolor_p6.pt",
+                    "--weights", "Darknet_model.pth",
                     "--device", "0",
                     "--name", "yolor_p6_palntdoc",
                     "--hyp", "hyp.scratch.1280.yaml",

@@ -83,7 +83,11 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
         nh_ckpt = torch.load(nh_weights, map_location=device)
         model = Darknet(opt.cfg).to(device)  # create
         state_dict = {k: v for k, v in ckpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
-        nh_state_dict = {k: v for k, v in nh_ckpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
+        nh_state_dict = {}
+        backbone_layers = nh_ckpt.keys()
+        for k, v in model.named_parameters():
+            if k in backbone_layers:
+                nh_state_dict[k] = nh_ckpt[k]
         nh_state_dict.update(state_dict)
         model.load_state_dict(nh_state_dict, strict=False)
         print('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
